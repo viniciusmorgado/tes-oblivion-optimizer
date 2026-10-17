@@ -248,3 +248,17 @@ are kept next to `Engine.ini`.
 ## License
 
 BSD 3-Clause, see `LICENSE`.
+
+## Disclaimer
+
+This is an independent, unofficial community project. It is not affiliated with, endorsed by
+or supported by Bethesda Softworks, ZeniMax Media, Microsoft, Virtuos or Epic Games.
+
+*The Elder Scrolls*, *Oblivion*, *Oblivion Remastered* and related names, logos and assets are
+trademarks or registered trademarks of ZeniMax Media Inc. and/or Bethesda Softworks LLC.
+*Unreal* and *Unreal Engine* are trademarks or registered trademarks of Epic Games, Inc.
+*NVIDIA*, *DLSS*, *Steam* and *Proton* belong to their respective owners. All names are used
+for identification only.
+
+The tool only edits the user configuration file in your own Proton prefix; it does not modify,
+redistribute or reverse engineer any game files. Use at your own risk.
