@@ -30,12 +30,31 @@ cd tes-oblivion-optimizer
 
 Run it with the game **closed**. Launch the game normally afterwards; nothing else to do.
 
+## Which one should I use?
+
+| tier | preset | composition | tested | notes |
+|---|---|---|---|---|
+| Quality | `quality` | `lumen-lite`, no `common` trims | no | only the Lumen budget is cut; shadows, fog, grass stay at menu values |
+| **Balanced (recommended)** | `balanced` | `lumen-lite` + `common` | **yes** | the best quality/performance balance found: foliage and lighting close to High, clearly faster than stock |
+| Balanced, fixed target | `balanced-60` | `lumen-lite` + `common` + `nofg`, 60 fps cap | no | same look, real frames only, for people who prefer a locked frame rate over Frame Generation |
+| Performance | `performance` | `lumen-off` + `dfao-off` + `ssr-off` + `lowfx` + `nofg` | partially (`ssgi` run) | largest frame rate; interiors flatter, no cloud shadows, less grass |
+| Performance with FG | `performance-fg` | same as above with Frame Generation kept | no | smoothest on screen, highest latency |
+
+```bash
+./oblivion-optimizer.py preset balanced --lock
+```
+
+A preset is just a named combination; any `-f`, `--fps`, `--set`, `--unset` given on the
+command line stacks on top. See [docs/TESTING.md](docs/TESTING.md) for what each run changed
+and what was observed.
+
 ## Commands
 
 | command | what it does |
 |---|---|
 | `list` | profiles and features with a one-line description each |
 | `apply PROFILE [options]` | compose and write the block (replaces any previous block) |
+| `preset NAME [options]` | apply a named combination from `presets/`; the same options as `apply` stack on top |
 | `show` | print the block currently in `Engine.ini` |
 | `status` | where `Engine.ini` is, whether it is locked, what is applied, how many backups |
 | `remove` | delete the block: the game behaves as if the tool was never used |
@@ -107,7 +126,7 @@ Order matters only when two blocks touch the same cvar: profile overrides `commo
 override the profile in the order given, `--fps` and `--set` override everything. The tool prints
 a note for every override and groups the written block by the source that won.
 
-## Writing your own profile or feature
+## Writing your own profile, feature or preset
 
 Drop a file in `profiles/` (one GI strategy) or `features/` (one independent toggle):
 
@@ -120,6 +139,20 @@ Altar.GraphicsOptions.Something=0
 
 Only `key=value` lines are written; section headers are ignored (everything goes to
 `[SystemSettings]`). Keep a feature to one concern so people can combine it.
+
+A preset in `presets/` names a combination instead of listing cvars:
+
+```ini
+# One-line description
+profile=lumen-lite
+features=nofg,ssr-off
+fps=60
+common=1
+set=r.Streaming.PoolSize=2500;r.VolumetricFog.GridPixelSize=32
+unset=grass.densityScale
+```
+
+When you test a combination, add a run to [docs/TESTING.md](docs/TESTING.md).
 
 ## How it works (and why the menu is not enough)
 

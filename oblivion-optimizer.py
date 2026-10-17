@@ -9,6 +9,7 @@ timestamped backup is taken before every write, and `remove` restores stock beha
 
 Quick start:
   ./oblivion-optimizer.py list
+  ./oblivion-optimizer.py preset balanced --lock
   ./oblivion-optimizer.py apply lumen-lite --lock
   ./oblivion-optimizer.py apply lumen-lite --feature nofg --fps 60 --lock
   ./oblivion-optimizer.py apply lumen-off --feature dfao-off --lock
@@ -42,6 +43,7 @@ DEFAULT_FEATURE = "common"
 HERE = Path(__file__).resolve().parent
 PROFILES_DIR = HERE / "profiles"
 FEATURES_DIR = HERE / "features"
+PRESETS_DIR = HERE / "presets"
 
 ENGINE_INI_REL = (
     "pfx/drive_c/users/steamuser/Documents/My Games/Oblivion Remastered/"
@@ -148,6 +150,29 @@ def read_profile(name: str):
 
 def read_feature(name: str):
     return _read_block_file(FEATURES_DIR, name, "feature")
+
+
+def read_preset(name: str) -> dict[str, str]:
+    """A preset is a named combination: profile=, features=a,b, fps=, set=k=v;k=v, unset=a;b."""
+    path = PRESETS_DIR / f"{name}.ini"
+    if not path.is_file():
+        sys.exit(f"Unknown preset '{name}'. Available: {', '.join(list_names(PRESETS_DIR))}")
+    data: dict[str, str] = {"description": ""}
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith(";"):
+            continue
+        if line.startswith("#"):
+            if not data["description"]:
+                data["description"] = line[1:].strip()
+            continue
+        if "=" not in line:
+            sys.exit(f"{path}: cannot parse line: {raw}")
+        key, value = line.split("=", 1)
+        data[key.strip().lower()] = value.strip()
+    if "profile" not in data:
+        sys.exit(f"{path}: a preset needs a 'profile=' line")
+    return data
 
 
 def list_names(kind_dir: Path) -> list[str]:
@@ -297,7 +322,15 @@ def write_engine_ini(path: Path, new_text: str) -> Path | None:
 # --------------------------------------------------------------------------- commands
 
 def cmd_list(_args: argparse.Namespace) -> None:
-    print("Profiles (pick exactly one):")
+    print("Presets (named combinations, use with `preset NAME`):")
+    for name in list_names(PRESETS_DIR):
+        data = read_preset(name)
+        combo = data["profile"] + (f" + {data['features']}" if data.get("features") else "")
+        combo += f" @ {data['fps']} fps" if data.get("fps") else ""
+        if data.get("common", "1").strip().lower() in ("0", "false", "no"):
+            combo += " (without common)"
+        print(f"  {name:14s} {data['description']}\n  {'':14s} = {combo}")
+    print("\nProfiles (pick exactly one):")
     for name in list_names(PROFILES_DIR):
         print(f"  {name:12s} {read_profile(name)[0]}")
     print(f"\nFeatures (combine freely with --feature; '{DEFAULT_FEATURE}' is on unless --no-common):")
@@ -328,6 +361,18 @@ def cmd_apply(args: argparse.Namespace) -> None:
         print(f"Backup: {bak}")
     if args.lock:
         set_readonly(ini, True)
+
+
+def cmd_preset(args: argparse.Namespace) -> None:
+    data = read_preset(args.name)
+    args.profile = data["profile"]
+    args.feature = [f.strip() for f in data.get("features", "").split(",") if f.strip()] + args.feature
+    args.no_common = data.get("common", "1").strip().lower() in ("0", "false", "no")
+    if args.fps is None and data.get("fps"):
+        args.fps = int(data["fps"])
+    args.set = [x for x in data.get("set", "").split(";") if x] + args.set
+    args.unset = [x for x in data.get("unset", "").split(";") if x] + args.unset
+    cmd_apply(args)
 
 
 def cmd_show(args: argparse.Namespace) -> None:
@@ -410,6 +455,17 @@ def main() -> None:
     p_apply.add_argument("--lock", action="store_true", help="make Engine.ini read-only afterwards")
     p_apply.add_argument("--dry-run", action="store_true", help="print the block instead of writing")
     p_apply.set_defaults(func=cmd_apply)
+
+    p_preset = sub.add_parser("preset", help="apply a named combination from presets/ (extra options stack on top)")
+    p_preset.add_argument("name", help="preset name (see list)")
+    p_preset.add_argument("--feature", "-f", action="append", default=[], metavar="NAME",
+                          help="add a feature on top of the preset (repeatable)")
+    p_preset.add_argument("--fps", type=int, metavar="N", help="override the preset's frame rate limit")
+    p_preset.add_argument("--set", action="append", default=[], metavar="CVAR=VALUE", help="extra override")
+    p_preset.add_argument("--unset", action="append", default=[], metavar="CVAR", help="drop a cvar")
+    p_preset.add_argument("--lock", action="store_true", help="make Engine.ini read-only afterwards")
+    p_preset.add_argument("--dry-run", action="store_true", help="print the block instead of writing")
+    p_preset.set_defaults(func=cmd_preset)
 
     sub.add_parser("show", help="print the managed block currently in Engine.ini").set_defaults(func=cmd_show)
     sub.add_parser("status", help="where Engine.ini is, lock state, what is applied").set_defaults(func=cmd_status)
